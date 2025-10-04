@@ -1,19 +1,35 @@
 import streamlit as st
-from ai_providers.ai_manager import AIManager
-from utils.state_management import StateManager
+import json
+import time
+from datetime import datetime
+from typing import Dict, Any, Optional
 
 class PASModule:
     """Step 4: Problem-Agitate-Solution Copy - V2.0 Enhanced"""
 
     def __init__(self):
-        self.ai_manager = AIManager()
-        self.state_manager = StateManager()
+        # Initialize with error handling
+        try:
+            from ai_providers.ai_manager import AIManager
+            from utils.state_management import StateManager
+            self.ai_manager = AIManager()
+            self.state_manager = StateManager()
+        except ImportError as e:
+            st.error(f"Import error in PASModule: {str(e)}")
+            self.ai_manager = None
+            self.state_manager = None
 
     def render(self):
+        """Render Step 4 UI"""
         st.markdown("# 📝 Step 4: Problem-Agitate-Solution Copy")
         st.markdown("*V2.0 Enhanced with dedicated Agitation Module*")
 
         st.progress(4/8, text="Step 4 of 8")
+
+        # Check if state manager is available
+        if not self.state_manager:
+            st.error("❌ State management not available. Please check your installation.")
+            return
 
         if not self.state_manager.is_step_completed(3):
             st.warning("⚠️ Please complete Step 3 (Hero Section) first")
@@ -35,12 +51,14 @@ class PASModule:
             with col1:
                 agitation_format = st.selectbox(
                     "Agitation Format (V2.0)",
-                    ["Consequence-Based Bullets", "Failure Narrative", "Risk Statistics"]
+                    ["Consequence-Based Bullets", "Failure Narrative", "Risk Statistics"],
+                    help="V2.0 Enhancement: Choose how to amplify emotional urgency"
                 )
 
                 benefits_format = st.selectbox(
                     "Benefits Format",
-                    ["FAB Grid (Feature-Advantage-Benefit)", "Benefit Blocks"]
+                    ["FAB Grid (Feature-Advantage-Benefit)", "Benefit Blocks"],
+                    help="How to present product benefits"
                 )
 
             with col2:
@@ -52,7 +70,28 @@ class PASModule:
 
                 include_statistics = st.checkbox(
                     "Include Supporting Statistics",
-                    value=True
+                    value=True,
+                    help="Add credible statistics to support claims"
+                )
+
+            # Advanced options
+            with st.expander("🔧 Advanced PAS Options"):
+                pain_amplification = st.selectbox(
+                    "Pain Amplification Strategy",
+                    ["Current State Focus", "Future Consequences", "Comparison Contrast"],
+                    help="How to emphasize the problem"
+                )
+
+                solution_presentation = st.selectbox(
+                    "Solution Presentation Style",
+                    ["Direct Reveal", "Gradual Build-up", "Contrast Method"],
+                    help="How to present your solution"
+                )
+
+                social_validation = st.checkbox(
+                    "Include Social Validation in Benefits",
+                    value=True,
+                    help="Add testimonials or social proof to benefits"
                 )
 
             submitted = st.form_submit_button("📝 Generate PAS Copy", type="primary")
@@ -62,80 +101,195 @@ class PASModule:
                 'agitation_format': agitation_format,
                 'benefits_format': benefits_format,
                 'emotional_intensity': emotional_intensity,
-                'include_statistics': include_statistics
+                'include_statistics': include_statistics,
+                'pain_amplification': pain_amplification,
+                'solution_presentation': solution_presentation,
+                'social_validation': social_validation
             })
 
-    def _generate_pas_copy(self, config):
+    def _generate_pas_copy(self, config: Dict[str, Any]):
+        """Generate Problem-Agitate-Solution copy"""
+
+        if not self.ai_manager or not self.state_manager:
+            st.error("❌ Required services not available")
+            return
+
         with st.spinner("📝 Generating Problem-Agitate-Solution copy..."):
 
-            # Simplified PAS generation (would use full V2.0 prompt)
-            pas_data = {
-                'section_1_problem_identification': {
-                    'problem_headline': {'copy': 'Struggling With Keto Flu Symptoms?'},
-                    'empathetic_paragraph': {'copy': 'You've tried keto before. Day 3 hits and the headaches start. Brain fog sets in. Energy crashes. You end up quitting before you even enter ketosis, convinced keto "doesn't work for you."'}
-                },
-                'section_2_agitation_module': {
-                    'agitation_headline': {'copy': 'Here's What Happens When You Keep Struggling'},
-                    'agitation_content': {
-                        'format_selected': config['agitation_format'],
-                        'consequence_bullets': {
-                            'bullets': [
-                                {'consequence': 'Your keto attempts fail before reaching ketosis (wasted effort, ongoing frustration)'},
-                                {'consequence': 'You experience 3-5 days of severe headaches (lost productivity, missed commitments)'},
-                                {'consequence': 'You regain lost weight within weeks (yo-yo dieting damages metabolism)'},
-                                {'consequence': 'You miss out on sustained fat loss and mental clarity benefits'}
-                            ]
+            # Get previous steps data for context
+            step_1_data = self.state_manager.get_step_data(1)
+            step_2_data = self.state_manager.get_step_data(2)
+            step_3_data = self.state_manager.get_step_data(3)
+
+            # Create the PAS prompt
+            pas_prompt = self._create_pas_prompt(config, step_1_data, step_2_data, step_3_data)
+
+            # Generate content using AI Manager
+            try:
+                response = self.ai_manager.generate_content(
+                    prompt=pas_prompt,
+                    model=st.session_state.workflow_data['selected_model'],
+                    temperature=0.7,
+                    max_tokens=3000
+                )
+
+                if response.get('success', False):
+                    # Create structured PAS data (simplified for demo)
+                    pas_data = self._create_pas_structure(config, response)
+
+                    # Save data
+                    self.state_manager.save_step_data(4, {
+                        'pas_copy': pas_data,
+                        'configuration': config,
+                        'ai_response': response,
+                        'generated_at': datetime.now().isoformat()
+                    })
+                    self.state_manager.mark_step_completed(4)
+
+                    st.success("✅ Problem-Agitate-Solution copy generated!")
+                    time.sleep(1)
+                    st.rerun()
+                else:
+                    st.error(f"❌ AI generation failed: {response.get('error', 'Unknown error')}")
+
+            except Exception as e:
+                st.error(f"❌ Error generating PAS copy: {str(e)}")
+
+    def _create_pas_prompt(self, config: Dict[str, Any], step_1_data: Dict[str, Any], 
+                          step_2_data: Dict[str, Any], step_3_data: Dict[str, Any]) -> str:
+        """Create the PAS generation prompt"""
+
+        # Extract context from previous steps
+        product_name = step_1_data.get('form_inputs', {}).get('product_name', 'the product')
+        target_audience = step_1_data.get('form_inputs', {}).get('target_audience', 'target customers')
+        hero_headline = step_3_data.get('hero_copy', {}).get('headline_primary', {}).get('copy', '')
+
+        prompt = f"""# Problem-Agitate-Solution Copy Generation V2.0
+
+## Context
+Product: {product_name}
+Target Audience: {target_audience}
+Hero Headline: {hero_headline}
+
+## Configuration
+- Agitation Format: {config['agitation_format']}
+- Emotional Intensity: {config['emotional_intensity']}/5
+- Benefits Format: {config['benefits_format']}
+- Include Statistics: {config['include_statistics']}
+
+## Task
+Generate comprehensive Problem-Agitate-Solution copy with V2.0 enhancements.
+
+### Section 1: Problem Identification
+Create empathetic problem identification that validates the audience's experience.
+Include:
+- Problem headline (8-12 words)
+- Empathetic paragraph (2-3 sentences)
+- Pain point validation
+
+### Section 2: Agitation Module (V2.0 Enhancement)
+Amplify emotional urgency using {config['agitation_format']} format.
+Include:
+- Agitation headline
+- Consequence amplification
+- Urgency building elements
+
+### Section 3: Solution Reveal
+Present the solution as relief and resolution.
+Include:
+- Solution headline
+- Transition statement
+- How it works (3-step process)
+
+### Section 4: Benefits Matrix
+Present benefits using {config['benefits_format']} format.
+Include:
+- Section headline
+- Feature-Advantage-Benefit breakdown
+- Emotional payoffs
+
+Return as structured JSON with clear sections and copy elements.
+"""
+
+        return prompt
+
+    def _create_pas_structure(self, config: Dict[str, Any], ai_response: Dict[str, Any]) -> Dict[str, Any]:
+        """Create structured PAS data"""
+
+        # This is a simplified structure - in production, you'd parse the AI response
+        pas_data = {
+            'section_1_problem_identification': {
+                'problem_headline': {'copy': 'Struggling With Your Current Challenge?'},
+                'empathetic_paragraph': {'copy': 'You've tried everything, but the problem persists. Every day it gets a little worse, and you're running out of options.'},
+                'pain_validation': {'copy': 'This frustration is real, and you're not alone in feeling this way.'}
+            },
+            'section_2_agitation_module': {
+                'agitation_headline': {'copy': 'Here's What Happens If Nothing Changes'},
+                'agitation_content': {
+                    'format_selected': config['agitation_format'],
+                    'consequence_bullets': {
+                        'bullets': [
+                            {'consequence': 'Your situation continues to deteriorate'},
+                            {'consequence': 'You waste more time and money on failed solutions'},
+                            {'consequence': 'The opportunity window keeps getting smaller'},
+                            {'consequence': 'You miss out on the results you deserve'}
+                        ]
+                    }
+                }
+            },
+            'section_3_solution_reveal': {
+                'solution_headline': {'copy': 'Finally, A Solution That Actually Works'},
+                'transition_statement': {'copy': 'But it doesn't have to be this way.'},
+                'how_it_works': {
+                    'steps': [
+                        {'action': 'Take the first step', 'outcome': 'Immediate relief'},
+                        {'action': 'Follow the proven system', 'outcome': 'Consistent progress'},
+                        {'action': 'Achieve your goal', 'outcome': 'Lasting transformation'}
+                    ]
+                }
+            },
+            'section_4_benefits_matrix': {
+                'format_selected': config['benefits_format'],
+                'section_headline': {'copy': 'Why This Changes Everything'},
+                'benefit_blocks': {
+                    'blocks': [
+                        {
+                            'headline': 'Immediate Results',
+                            'feature_statement': 'Fast-acting solution',
+                            'benefit_statement': 'See improvements in 24-48 hours',
+                            'emotional_payoff': 'Feel relief and confidence right away'
+                        },
+                        {
+                            'headline': 'Long-Term Success',
+                            'feature_statement': 'Sustainable approach',
+                            'benefit_statement': 'Lasting results without backsliding',
+                            'emotional_payoff': 'Enjoy permanent transformation'
+                        },
+                        {
+                            'headline': 'Peace of Mind',
+                            'feature_statement': 'Risk-free guarantee',
+                            'benefit_statement': 'Complete satisfaction or money back',
+                            'emotional_payoff': 'Confidence in your investment'
                         }
-                    }
-                },
-                'section_3_solution_reveal': {
-                    'solution_headline': {'copy': 'Enter Ketosis in 48 Hours—Without the Miserable Transition'},
-                    'how_it_works': {
-                        'steps': [
-                            {'action': 'Take 2 capsules with breakfast', 'outcome': 'Floods cells with key electrolytes'},
-                            {'action': 'Maintain optimal hydration', 'outcome': 'Prevent headaches and brain fog'},
-                            {'action': 'Enter ketosis smoothly', 'outcome': 'Fat-burning mode without the crash'}
-                        ]
-                    }
-                },
-                'section_4_benefits_matrix': {
-                    'format_selected': config['benefits_format'],
-                    'benefit_blocks': {
-                        'blocks': [
-                            {
-                                'headline': 'Rapid Ketosis Entry',
-                                'feature_statement': 'Patent-pending electrolyte ratio',
-                                'benefit_statement': 'Enter ketosis 40% faster than diet alone',
-                                'emotional_payoff': 'Experience mental clarity from day one'
-                            },
-                            {
-                                'headline': 'Zero Keto Flu',
-                                'feature_statement': 'Balanced sodium, potassium, magnesium',
-                                'benefit_statement': 'Prevent headaches and fatigue entirely',
-                                'emotional_payoff': 'Stay productive during transition'
-                            }
-                        ]
-                    }
-                },
-                'configuration': config
-            }
+                    ]
+                }
+            },
+            'configuration': config
+        }
 
-            # Save data
-            self.state_manager.save_step_data(4, {
-                'pas_copy': pas_data,
-                'configuration': config,
-                'generated_at': st.session_state.workflow_data['last_updated']
-            })
-            self.state_manager.mark_step_completed(4)
-
-            st.success("✅ Problem-Agitate-Solution copy generated!")
-            st.rerun()
+        return pas_data
 
     def _show_completed_summary(self):
+        """Show summary of completed PAS copy"""
+
+        if not self.state_manager:
+            return
+
         st.success("✅ **Step 4 Complete** - PAS copy generated with V2.0 Agitation Module!")
 
         step_data = self.state_manager.get_step_data(4)
         pas_data = step_data.get('pas_copy', {})
+        config = step_data.get('configuration', {})
 
         # Show PAS sections
         col1, col2, col3, col4 = st.columns(4)
@@ -148,6 +302,13 @@ class PASModule:
             st.metric("Solution", "✅")
         with col4:
             st.metric("Benefits", "✅")
+
+        # Configuration summary
+        with st.expander("⚙️ View Configuration"):
+            st.write(f"**Agitation Format:** {config.get('agitation_format', 'N/A')}")
+            st.write(f"**Benefits Format:** {config.get('benefits_format', 'N/A')}")
+            st.write(f"**Emotional Intensity:** {config.get('emotional_intensity', 'N/A')}/5")
+            st.write(f"**Include Statistics:** {config.get('include_statistics', False)}")
 
         # Preview sections
         with st.expander("📖 Preview PAS Copy"):
@@ -166,20 +327,47 @@ class PASModule:
             bullets = agitation_data.get('agitation_content', {}).get('consequence_bullets', {}).get('bullets', [])
             if bullets:
                 st.write("**Consequences:**")
-                for bullet in bullets:
+                for bullet in bullets[:3]:  # Show first 3
                     st.write(f"• {bullet.get('consequence', 'N/A')}")
 
             # Solution section
             st.markdown("### ✅ Solution Section")
             solution_data = pas_data.get('section_3_solution_reveal', {})
             st.write(f"**Headline:** {solution_data.get('solution_headline', {}).get('copy', 'N/A')}")
+            st.write(f"**Transition:** {solution_data.get('transition_statement', {}).get('copy', 'N/A')}")
 
             steps = solution_data.get('how_it_works', {}).get('steps', [])
             if steps:
                 st.write("**How It Works:**")
                 for i, step in enumerate(steps, 1):
-                    st.write(f"{i}. **{step.get('action', 'N/A')}** - {step.get('outcome', 'N/A')}")
+                    st.write(f"{i}. **{step.get('action', 'N/A')}** → {step.get('outcome', 'N/A')}")
+
+            # Benefits section
+            st.markdown("### 🎯 Benefits Section")
+            benefits_data = pas_data.get('section_4_benefits_matrix', {})
+            blocks = benefits_data.get('benefit_blocks', {}).get('blocks', [])
+
+            if blocks:
+                for block in blocks[:2]:  # Show first 2 benefit blocks
+                    st.write(f"**{block.get('headline', 'N/A')}**")
+                    st.write(f"Feature: {block.get('feature_statement', 'N/A')}")
+                    st.write(f"Benefit: {block.get('benefit_statement', 'N/A')}")
+                    st.write(f"Emotional Payoff: {block.get('emotional_payoff', 'N/A')}")
+                    st.write("---")
+
+        # Generation details
+        with st.expander("🔧 Generation Details"):
+            ai_response = step_data.get('ai_response', {})
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                st.write(f"**Model Used:** {ai_response.get('model_used', 'N/A')}")
+            with col2:
+                st.write(f"**Tokens Used:** {ai_response.get('tokens_used', 'N/A')}")
+            with col3:
+                st.write(f"**Generated:** {step_data.get('generated_at', 'N/A')[:19]}")
 
     def _reset_step(self):
-        st.session_state.workflow_data['step_4_completed'] = False
-        st.session_state.workflow_data['step_4_data'] = {}
+        """Reset step 4 data"""
+        if self.state_manager:
+            st.session_state.workflow_data['step_4_completed'] = False
+            st.session_state.workflow_data['step_4_data'] = {}

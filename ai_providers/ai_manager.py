@@ -1,11 +1,27 @@
 import streamlit as st
-import openai
-import anthropic
-import google.generativeai as genai
 import json
 import time
 import random
 from typing import Dict, Any, Optional
+
+# Import AI providers with error handling
+try:
+    import openai
+    OPENAI_AVAILABLE = True
+except ImportError:
+    OPENAI_AVAILABLE = False
+
+try:
+    import anthropic
+    ANTHROPIC_AVAILABLE = True
+except ImportError:
+    ANTHROPIC_AVAILABLE = False
+
+try:
+    import google.generativeai as genai
+    GOOGLE_AVAILABLE = True
+except ImportError:
+    GOOGLE_AVAILABLE = False
 
 class AIManager:
     """Manages communication with multiple AI providers"""
@@ -15,33 +31,38 @@ class AIManager:
 
     def setup_api_clients(self):
         """Initialize API clients using Streamlit secrets"""
+        self.openai_available = False
+        self.anthropic_available = False
+        self.gemini_available = False
+
         try:
             # OpenAI
-            if 'OPENAI_API_KEY' in st.secrets:
+            if OPENAI_AVAILABLE and 'OPENAI_API_KEY' in st.secrets:
                 openai.api_key = st.secrets['OPENAI_API_KEY']
                 self.openai_available = True
-            else:
-                self.openai_available = False
 
             # Anthropic
-            if 'ANTHROPIC_API_KEY' in st.secrets:
+            if ANTHROPIC_AVAILABLE and 'ANTHROPIC_API_KEY' in st.secrets:
                 self.anthropic_client = anthropic.Anthropic(api_key=st.secrets['ANTHROPIC_API_KEY'])
                 self.anthropic_available = True
-            else:
-                self.anthropic_available = False
 
             # Google Gemini
-            if 'GOOGLE_API_KEY' in st.secrets:
+            if GOOGLE_AVAILABLE and 'GOOGLE_API_KEY' in st.secrets:
                 genai.configure(api_key=st.secrets['GOOGLE_API_KEY'])
                 self.gemini_available = True
-            else:
-                self.gemini_available = False
 
         except Exception as e:
-            st.error(f"Error setting up AI clients: {str(e)}")
+            st.warning(f"⚠️ API setup warning: {str(e)}")
 
     def generate_content(self, prompt: str, model: str, temperature: float = 0.7, max_tokens: int = 4000) -> Dict[str, Any]:
         """Generate content using specified AI model with error handling and retry logic"""
+
+        # Check if any providers are available
+        if not (self.openai_available or self.anthropic_available or self.gemini_available):
+            return {
+                "error": "No AI providers available. Please configure API keys in Streamlit Cloud secrets.",
+                "success": False
+            }
 
         for attempt in range(3):  # Retry up to 3 times
             try:
@@ -52,21 +73,32 @@ class AIManager:
                 elif model.startswith('gemini') and self.gemini_available:
                     return self._generate_gemini(prompt, temperature, max_tokens)
                 else:
-                    return {"error": f"Model {model} not available or API key not configured"}
+                    # Fallback to available provider
+                    if self.gemini_available:
+                        return self._generate_gemini(prompt, temperature, max_tokens)
+                    elif self.anthropic_available:
+                        return self._generate_anthropic(prompt, "claude-3-5-sonnet-20240620", temperature, max_tokens)
+                    elif self.openai_available:
+                        return self._generate_openai(prompt, "gpt-4-turbo-preview", temperature, max_tokens)
+                    else:
+                        return {"error": f"Model {model} not available and no fallback providers configured", "success": False}
 
             except Exception as e:
                 if attempt == 2:  # Last attempt
-                    return {"error": f"Failed after 3 attempts: {str(e)}"}
+                    return {"error": f"Failed after 3 attempts: {str(e)}", "success": False}
                 else:
                     time.sleep(random.uniform(1, 3))  # Random delay before retry
                     continue
 
-        return {"error": "Unexpected error in content generation"}
+        return {"error": "Unexpected error in content generation", "success": False}
 
     def _generate_openai(self, prompt: str, model: str, temperature: float, max_tokens: int) -> Dict[str, Any]:
         """Generate content using OpenAI models"""
         try:
-            response = openai.ChatCompletion.create(
+            # Use the new OpenAI client format
+            client = openai.OpenAI(api_key=st.secrets['OPENAI_API_KEY'])
+
+            response = client.chat.completions.create(
                 model=model,
                 messages=[{"role": "user", "content": prompt}],
                 temperature=temperature,
@@ -215,3 +247,11 @@ class AIManager:
                 "raw_content": content,
                 "valid": False
             }
+
+    def get_provider_status(self) -> Dict[str, bool]:
+        """Get status of all AI providers"""
+        return {
+            "openai": self.openai_available,
+            "anthropic": self.anthropic_available, 
+            "gemini": self.gemini_available
+        }

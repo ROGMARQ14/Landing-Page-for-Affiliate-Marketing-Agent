@@ -1,4 +1,3 @@
-
 import streamlit as st
 import json
 import time
@@ -16,23 +15,28 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Import custom modules
-from modules.step_1_research import ProductResearchModule
-from modules.step_2_outline import OutlineModule  
-from modules.step_3_hero import HeroModule
-from modules.step_4_pas_copy import PASModule
-from modules.step_5_social_proof import SocialProofModule
-from modules.step_6_final_cta import FinalCTAModule
-from modules.step_7_assembly import AssemblyModule
-from modules.step_8_design import DesignModule
-from ai_providers.ai_manager import AIManager
-from outputs.output_generator import OutputGenerator
-from utils.state_management import StateManager
-from utils.validation import ValidationHelper
+# Import custom modules - with error handling
+try:
+    from modules.step_1_research import ProductResearchModule
+    from modules.step_2_outline import OutlineModule  
+    from modules.step_3_hero import HeroModule
+    from modules.step_4_pas_copy import PASModule
+    from modules.step_5_social_proof import SocialProofModule
+    from modules.step_6_final_cta import FinalCTAModule
+    from modules.step_7_assembly import AssemblyModule
+    from modules.step_8_design import DesignModule
+    from ai_providers.ai_manager import AIManager
+    from outputs.output_generator import OutputGenerator
+    from utils.state_management import StateManager
+    from utils.validation import ValidationHelper
+except ImportError as e:
+    st.error(f"Import Error: {str(e)}")
+    st.error("Please ensure all module files are present and correctly formatted.")
+    st.stop()
 
 # Custom CSS for better UI
 def load_custom_css():
-    st.markdown('''
+    st.markdown("""
     <style>
     .main-header {
         font-size: 2.5rem;
@@ -101,7 +105,7 @@ def load_custom_css():
         margin: 1rem 0;
     }
     </style>
-    ''', unsafe_allow_html=True)
+    """, unsafe_allow_html=True)
 
 def main():
     load_custom_css()
@@ -155,14 +159,14 @@ def main():
         progress_percentage = (steps_completed / 8) * 100
 
         # Custom progress bar
-        st.markdown(f'''
+        st.markdown(f"""
         <div class="progress-bar">
             <div class="progress-fill" style="width: {progress_percentage}%"></div>
         </div>
         <p style="text-align: center; margin: 0.5rem 0;">
             {steps_completed}/8 Steps Complete ({progress_percentage:.0f}%)
         </p>
-        ''', unsafe_allow_html=True)
+        """, unsafe_allow_html=True)
 
         # Navigation Menu
         st.markdown("### 🧭 Navigation")
@@ -243,7 +247,7 @@ def save_project():
     project_data = st.session_state.workflow_data.copy()
     project_data['saved_at'] = datetime.now().isoformat()
 
-    json_data = json.dumps(project_data, indent=2)
+    json_data = json.dumps(project_data, indent=2, default=str)
     st.download_button(
         label="📥 Download Project File",
         data=json_data,
@@ -298,13 +302,16 @@ def export_options():
     # Word Document Export
     if st.button("📄 Generate Word Document", use_container_width=True):
         with st.spinner("Generating Word Document..."):
-            docx_content = output_generator.generate_docx(st.session_state.workflow_data)
-            st.download_button(
-                label="📥 Download Word Document",
-                data=docx_content,
-                file_name=f"{st.session_state.workflow_data.get('project_name', 'landing_page')}.docx",
-                mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-            )
+            try:
+                docx_content = output_generator.generate_docx(st.session_state.workflow_data)
+                st.download_button(
+                    label="📥 Download Word Document",
+                    data=docx_content,
+                    file_name=f"{st.session_state.workflow_data.get('project_name', 'landing_page')}.docx",
+                    mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                )
+            except ImportError:
+                st.warning("⚠️ Word document generation requires python-docx package. HTML and Markdown exports are available.")
 
     # Complete Package Export
     if st.button("📦 Generate Complete Package", use_container_width=True):
