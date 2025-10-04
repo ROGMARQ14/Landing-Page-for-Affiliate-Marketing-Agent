@@ -4,23 +4,18 @@ import time
 from datetime import datetime
 from typing import Dict, Any, Optional
 
-# Import with error handling
-try:
-    from ai_providers.ai_manager import AIManager
-    from utils.state_management import StateManager
-except ImportError as e:
-    st.error(f"Module import error: {str(e)}")
-
 class PASModule:
     """Step 4: Problem-Agitate-Solution Copy - V2.0 Enhanced"""
 
     def __init__(self):
         # Initialize with error handling
         try:
+            from ai_providers.ai_manager import AIManager
+            from utils.state_management import StateManager
             self.ai_manager = AIManager()
             self.state_manager = StateManager()
-        except Exception as e:
-            st.error(f"Error initializing PASModule: {str(e)}")
+        except ImportError as e:
+            st.error(f"Import error in PASModule: {str(e)}")
             self.ai_manager = None
             self.state_manager = None
 
@@ -122,13 +117,9 @@ class PASModule:
         with st.spinner("📝 Generating Problem-Agitate-Solution copy..."):
 
             # Get previous steps data for context
-            try:
-                step_1_data = self.state_manager.get_step_data(1)
-                step_2_data = self.state_manager.get_step_data(2)
-                step_3_data = self.state_manager.get_step_data(3)
-            except Exception as e:
-                st.error(f"Error getting previous step data: {str(e)}")
-                return
+            step_1_data = self.state_manager.get_step_data(1)
+            step_2_data = self.state_manager.get_step_data(2)
+            step_3_data = self.state_manager.get_step_data(3)
 
             # Create the PAS prompt
             pas_prompt = self._create_pas_prompt(config, step_1_data, step_2_data, step_3_data)
@@ -143,7 +134,7 @@ class PASModule:
                 )
 
                 if response.get('success', False):
-                    # Create structured PAS data
+                    # Create structured PAS data (simplified for demo)
                     pas_data = self._create_pas_structure(config, response)
 
                     # Save data
@@ -229,11 +220,11 @@ Return as structured JSON with clear sections and copy elements.
         pas_data = {
             'section_1_problem_identification': {
                 'problem_headline': {'copy': 'Struggling With Your Current Challenge?'},
-                'empathetic_paragraph': {'copy': 'You have tried everything, but the problem persists. Every day it gets a little worse, and you are running out of options.'},
-                'pain_validation': {'copy': 'This frustration is real, and you are not alone in feeling this way.'}
+                'empathetic_paragraph': {'copy': 'You've tried everything, but the problem persists. Every day it gets a little worse, and you're running out of options.'},
+                'pain_validation': {'copy': 'This frustration is real, and you're not alone in feeling this way.'}
             },
             'section_2_agitation_module': {
-                'agitation_headline': {'copy': 'Here Is What Happens If Nothing Changes'},
+                'agitation_headline': {'copy': 'Here's What Happens If Nothing Changes'},
                 'agitation_content': {
                     'format_selected': config['agitation_format'],
                     'consequence_bullets': {
@@ -248,7 +239,7 @@ Return as structured JSON with clear sections and copy elements.
             },
             'section_3_solution_reveal': {
                 'solution_headline': {'copy': 'Finally, A Solution That Actually Works'},
-                'transition_statement': {'copy': 'But it does not have to be this way.'},
+                'transition_statement': {'copy': 'But it doesn't have to be this way.'},
                 'how_it_works': {
                     'steps': [
                         {'action': 'Take the first step', 'outcome': 'Immediate relief'},
