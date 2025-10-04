@@ -221,7 +221,7 @@ Return as structured JSON with clear sections and copy elements.
             'section_1_problem_identification': {
                 'problem_headline': {'copy': 'Struggling With Your Current Challenge?'},
                 'empathetic_paragraph': {'copy': 'You've tried everything, but the problem persists. Every day it gets a little worse, and you're running out of options.'},
-                'pain_validation': {'copy': 'This frustration is real, and you're not alone in feeling this way.'}
+                'pain_validation': {'copy': 'This frustration is real, and you are not alone in feeling this way.'}
             },
             'section_2_agitation_module': {
                 'agitation_headline': {'copy': 'Here's What Happens If Nothing Changes'},
